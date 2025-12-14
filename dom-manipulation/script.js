@@ -15,11 +15,11 @@ function saveQuotes() {
     localStorage.setItem('quotes', JSON.stringify(quotes));
 }
 
-// --- Step 1: Simulate Server Interaction (New Function) ---
+// --- Step 1: Simulate Server Interaction (GET) ---
 
 /**
- * MANDATORY: Fetches mock quotes from the simulated server (JSONPlaceholder)
- * and maps them to our quote object structure.
+ * Fetches mock quotes from the simulated server (JSONPlaceholder).
+ * (Used for synchronization)
  * @returns {Array} Array of quotes fetched from the server.
  */
 async function fetchQuotesFromServer() {
@@ -29,12 +29,11 @@ async function fetchQuotesFromServer() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
-    
         const serverData = await response.json();
         
         // Map posts to our quote format (using only the first 5 for simulation)
         const serverQuotes = serverData.slice(0, 5).map(post => ({
-            // Assign a unique server ID
+        
             id: `server-${post.id}`, 
             text: post.title, 
             category: `Server-${post.userId}` 
@@ -46,19 +45,55 @@ async function fetchQuotesFromServer() {
         console.error("Failed to fetch quotes from server:", error);
         document.getElementById('quoteDisplay').innerHTML = 
             `<p style="color:red;">Failed to connect to server for sync. Check console.</p>`;
-        return []; // Return empty array on failure
+        return []; 
     }
 }
 
-// --- Step 2 & 3: Data Syncing and Conflict Resolution ---
-
 /**
- * Implements periodic data fetching, syncing, and conflict resolution.
+ * NEW: Simulates sending a new quote to the server using the POST method.
+ * Demonstrates 'method', 'headers', 'Content-Type', and 'application/json'.
  */
+async function postQuoteToServer(quoteObject) {
+    // JSONPlaceholder doesn't actually store data, but it simulates a POST success
+    const mockPostData = {
+        title: quoteObject.text,
+        body: `Category: ${quoteObject.category}`,
+        userId: 1, // Mock user ID
+    };
+
+    try {
+        const response = await fetch(SERVER_URL, {
+            method: 'POST', // The required method
+            headers: { // The required headers object
+                'Content-Type': 'application/json', // The required content type
+            },
+            body: JSON.stringify(mockPostData)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server post failed with status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log("Successfully posted new quote to server (Mock ID received):", result.id);
+        
+        // In a real application, you would update the quote's ID here:
+        // quoteObject.id = `server-${result.id}`; 
+        
+        return true;
+
+    } catch (error) {
+        console.error("Error during POST request:", error);
+        return false;
+    }
+}
+
+// --- Step 2 & 3: Data Syncing and Conflict Resolution (GET) ---
+
 async function syncWithServer() {
     console.log("Starting data sync...");
     
-    // Call the new dedicated function
+    
     const serverQuotes = await fetchQuotesFromServer(); 
     
     if (serverQuotes.length === 0) {
@@ -67,9 +102,8 @@ async function syncWithServer() {
     }
 
     let conflictsResolved = 0;
-    let newQuotesAdded = 0;
     
-    // Save current length for comparison
+    let newQuotesAdded = 0;
     const quotesBeforeSync = quotes.length; 
 
     // Conflict Resolution Loop: Server Data Precedence (Last Write Wins)
@@ -77,24 +111,19 @@ async function syncWithServer() {
         const existingIndex = quotes.findIndex(localQ => localQ.id === serverQ.id);
 
         if (existingIndex !== -1) {
-            // Case 1: Conflict/Match found (ID match)
             if (quotes[existingIndex].text !== serverQ.text) {
                  conflictsResolved++;
             }
-            // Server data takes precedence: overwrite local quote
             quotes[existingIndex] = serverQ;
         } else {
-            // Case 2: New quote from server
             quotes.push(serverQ);
             newQuotesAdded++;
         }
     });
     
-    // Update local storage and UI elements
     saveQuotes();
     populateCategories();
     
-    // Step 3: Notification System
     if (conflictsResolved > 0 || newQuotesAdded > 0) {
         alert(`Sync complete! ${newQuotesAdded} new quotes added, ${conflictsResolved} conflicts resolved (Server data won).`);
     } else if (quotes.length > quotesBeforeSync) {
@@ -102,16 +131,43 @@ async function syncWithServer() {
     }
 }
 
-// Start the periodic sync process
 setInterval(syncWithServer, SYNC_INTERVAL);
 
 
-// --- Core UI Functions (Retained from previous step) ---
+// --- Core UI Functions and Handlers ---
+
+async function addQuote() {
+    const textInput = document.getElementById('newQuoteText');
+    const catInput = document.getElementById('newQuoteCategory');
+    
+    if (textInput.value && catInput.value) {
+        const newId = `local-${Date.now()}`;
+        const newQuote = { text: textInput.value, category: catInput.value, id: newId };
+        
+        // 1. Add locally first
+        quotes.push(newQuote);
+        saveQuotes();
+        populateCategories();
+        
+        // 2. Attempt to post to server immediately
+        const postSuccess = await postQuoteToServer(newQuote);
+
+        if (postSuccess) {
+            alert("Quote added locally AND successfully posted to server!");
+            // In a real app, you'd mark this quote as 'synced' or update its ID here
+        } else {
+            alert("Quote added locally, but failed to post to server. Will rely on next sync.");
+        }
+        
+        textInput.value = '';
+        catInput.value = '';
+    }
+}
 
 function showRandomQuote() {
+    // ... (implementation unchanged) ...
     const selectedCategory = document.getElementById('categoryFilter').value;
     const quoteDisplay = document.getElementById('quoteDisplay');
-
     
     const filteredQuotes = selectedCategory === 'all' 
         ? quotes 
@@ -125,12 +181,10 @@ function showRandomQuote() {
     const randomIndex = Math.floor(Math.random() * filteredQuotes.length);
     const quote = filteredQuotes[randomIndex];
 
-
     quoteDisplay.innerHTML = ''; 
     
     const quoteParagraph = document.createElement('p');
     quoteParagraph.textContent = `"${quote.text}"`;
-
 
     const categorySpan = document.createElement('span');
     categorySpan.textContent = `- ${quote.category} (ID: ${quote.id || 'N/A'})`; 
@@ -138,7 +192,6 @@ function showRandomQuote() {
 
     quoteDisplay.appendChild(quoteParagraph);
     quoteDisplay.appendChild(categorySpan);
-
 
     sessionStorage.setItem('lastQuote', JSON.stringify(quote));
 }
@@ -161,28 +214,10 @@ function filterQuotes() {
     showRandomQuote();
 }
 
-function addQuote() {
-    const textInput = document.getElementById('newQuoteText');
-    const catInput = document.getElementById('newQuoteCategory');
-    
-    if (textInput.value && catInput.value) {
-        // Assign a temporary unique ID for new local quotes
-        const newId = `local-${Date.now()}`;
-        quotes.push({ text: textInput.value, category: catInput.value, id: newId });
-        saveQuotes();
-        populateCategories();
-        
-        textInput.value = '';
-        catInput.value = '';
-        alert("Quote added locally. Will sync with server soon.");
-    }
-}
-
 function createAddQuoteForm() {
     const container = document.getElementById('formContainer');
-    
     container.innerHTML = `
-        <h3>Add New Quote (Local)</h3>
+        <h3>Add New Quote (Local & POST to Server)</h3>
         <input id="newQuoteText" type="text" placeholder="Enter quote text" style="width:70%; padding:8px;">
         <input id="newQuoteCategory" type="text" placeholder="Category" style="padding:8px;">
         <button onclick="addQuote()">Add Quote</button>
@@ -195,13 +230,9 @@ function importFromJsonFile(event) { /* ... implementation ... */ }
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
-    
     createAddQuoteForm();
-    
     populateCategories();
-   
     showRandomQuote();
     
-    // Initial server sync upon page load
     syncWithServer();
 });

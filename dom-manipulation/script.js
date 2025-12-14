@@ -10,17 +10,14 @@ let quotes = JSON.parse(localStorage.getItem('quotes')) || [
     { text: "Strive not to be a success, but rather to be of value.", category: "Inspiration", id: 'local-2' }
 ];
 
-
 function saveQuotes() {
     localStorage.setItem('quotes', JSON.stringify(quotes));
 }
 
-// --- Step 1: Simulate Server Interaction (GET) ---
+// --- Server Interaction (GET & POST) ---
 
 /**
- * Fetches mock quotes from the simulated server (JSONPlaceholder).
- * (Used for synchronization)
- * @returns {Array} Array of quotes fetched from the server.
+ * MANDATORY: Fetches mock quotes from the simulated server (JSONPlaceholder).
  */
 async function fetchQuotesFromServer() {
     try {
@@ -33,7 +30,6 @@ async function fetchQuotesFromServer() {
         
         // Map posts to our quote format (using only the first 5 for simulation)
         const serverQuotes = serverData.slice(0, 5).map(post => ({
-        
             id: `server-${post.id}`, 
             text: post.title, 
             category: `Server-${post.userId}` 
@@ -50,22 +46,20 @@ async function fetchQuotesFromServer() {
 }
 
 /**
- * NEW: Simulates sending a new quote to the server using the POST method.
- * Demonstrates 'method', 'headers', 'Content-Type', and 'application/json'.
+ * Simulates sending a new quote to the server using the POST method.
  */
 async function postQuoteToServer(quoteObject) {
-    // JSONPlaceholder doesn't actually store data, but it simulates a POST success
     const mockPostData = {
         title: quoteObject.text,
         body: `Category: ${quoteObject.category}`,
-        userId: 1, // Mock user ID
+        userId: 1, 
     };
 
     try {
         const response = await fetch(SERVER_URL, {
-            method: 'POST', // The required method
-            headers: { // The required headers object
-                'Content-Type': 'application/json', // The required content type
+            method: 'POST', 
+            headers: { 
+                'Content-Type': 'application/json', 
             },
             body: JSON.stringify(mockPostData)
         });
@@ -76,10 +70,6 @@ async function postQuoteToServer(quoteObject) {
 
         const result = await response.json();
         console.log("Successfully posted new quote to server (Mock ID received):", result.id);
-        
-        // In a real application, you would update the quote's ID here:
-        // quoteObject.id = `server-${result.id}`; 
-        
         return true;
 
     } catch (error) {
@@ -88,12 +78,16 @@ async function postQuoteToServer(quoteObject) {
     }
 }
 
-// --- Step 2 & 3: Data Syncing and Conflict Resolution (GET) ---
+// --- Step 2 & 3: Data Syncing and Conflict Resolution ---
 
-async function syncWithServer() {
-    console.log("Starting data sync...");
+/**
+ * MANDATORY: Implements periodic data fetching, syncing, and conflict resolution.
+ * This is the function that replaces syncWithServer.
+ */
+async function syncQuotes() {
+    console.log("Starting data sync (syncQuotes)...");
     
-    
+    // 1. Fetch data from server
     const serverQuotes = await fetchQuotesFromServer(); 
     
     if (serverQuotes.length === 0) {
@@ -102,28 +96,32 @@ async function syncWithServer() {
     }
 
     let conflictsResolved = 0;
-    
     let newQuotesAdded = 0;
     const quotesBeforeSync = quotes.length; 
 
-    // Conflict Resolution Loop: Server Data Precedence (Last Write Wins)
+    // 2. Conflict Resolution Loop: Server Data Precedence (Last Write Wins)
     serverQuotes.forEach(serverQ => {
         const existingIndex = quotes.findIndex(localQ => localQ.id === serverQ.id);
 
         if (existingIndex !== -1) {
+            // Found a match (or conflict)
             if (quotes[existingIndex].text !== serverQ.text) {
                  conflictsResolved++;
             }
+            // Server data takes precedence: overwrite local quote
             quotes[existingIndex] = serverQ;
         } else {
+            // New quote from server
             quotes.push(serverQ);
             newQuotesAdded++;
         }
     });
     
+    // 3. Update local storage and UI elements
     saveQuotes();
     populateCategories();
     
+    // 4. Notification System
     if (conflictsResolved > 0 || newQuotesAdded > 0) {
         alert(`Sync complete! ${newQuotesAdded} new quotes added, ${conflictsResolved} conflicts resolved (Server data won).`);
     } else if (quotes.length > quotesBeforeSync) {
@@ -131,7 +129,8 @@ async function syncWithServer() {
     }
 }
 
-setInterval(syncWithServer, SYNC_INTERVAL);
+// Start the periodic sync process
+setInterval(syncQuotes, SYNC_INTERVAL);
 
 
 // --- Core UI Functions and Handlers ---
@@ -149,12 +148,11 @@ async function addQuote() {
         saveQuotes();
         populateCategories();
         
-        // 2. Attempt to post to server immediately
+        // 2. Attempt to post to server immediately (simulating commit)
         const postSuccess = await postQuoteToServer(newQuote);
 
         if (postSuccess) {
             alert("Quote added locally AND successfully posted to server!");
-            // In a real app, you'd mark this quote as 'synced' or update its ID here
         } else {
             alert("Quote added locally, but failed to post to server. Will rely on next sync.");
         }
@@ -165,7 +163,6 @@ async function addQuote() {
 }
 
 function showRandomQuote() {
-    // ... (implementation unchanged) ...
     const selectedCategory = document.getElementById('categoryFilter').value;
     const quoteDisplay = document.getElementById('quoteDisplay');
     
@@ -225,8 +222,38 @@ function createAddQuoteForm() {
 }
 
 // --- Import/Export (Stubs retained) ---
-function exportToJsonFile() { /* ... implementation ... */ }
-function importFromJsonFile(event) { /* ... implementation ... */ }
+function exportToJsonFile() { 
+    const dataStr = JSON.stringify(quotes, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'quotes.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+function importFromJsonFile(event) {
+    const fileReader = new FileReader();
+    fileReader.onload = function(event) {
+        try {
+            const importedQuotes = JSON.parse(event.target.result);
+            if (!Array.isArray(importedQuotes)) throw new Error("Invalid format");
+            
+            const newQuotes = importedQuotes.filter(impQ => !quotes.some(q => q.text === impQ.text));
+            quotes.push(...newQuotes);
+            
+            saveQuotes();
+            populateCategories();
+            alert(`${newQuotes.length} quotes imported successfully!`);
+        } catch (e) {
+            alert("Error importing file. Please ensure it is a valid JSON array of quotes.");
+        }
+    };
+    fileReader.readAsText(event.target.files[0]);
+}
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -234,5 +261,6 @@ document.addEventListener('DOMContentLoaded', () => {
     populateCategories();
     showRandomQuote();
     
-    syncWithServer();
+    // Initial server sync upon page load
+    syncQuotes();
 });

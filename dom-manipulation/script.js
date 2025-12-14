@@ -1,7 +1,8 @@
 // --- Global Configuration ---
 const SERVER_URL = 'https://jsonplaceholder.typicode.com/posts';
-const SYNC_INTERVAL = 10000; 
+const SYNC_INTERVAL = 10000; // Sync every 10 seconds (for simulation)
 
+// --- Initialization & Data Management ---
 
 // Load quotes from Local Storage or use defaults
 let quotes = JSON.parse(localStorage.getItem('quotes')) || [
@@ -14,70 +15,90 @@ function saveQuotes() {
     localStorage.setItem('quotes', JSON.stringify(quotes));
 }
 
-// --- Step 1 & 2: Server Interaction and Data Syncing ---
+// --- Step 1: Simulate Server Interaction (New Function) ---
 
 /**
- * Simulates fetching quotes from the server and performing conflict resolution.
+ * MANDATORY: Fetches mock quotes from the simulated server (JSONPlaceholder)
+ * and maps them to our quote object structure.
+ * @returns {Array} Array of quotes fetched from the server.
  */
-async function syncWithServer() {
-    console.log("Starting data sync...");
-    const quoteDisplay = document.getElementById('quoteDisplay');
-    let conflictsResolved = 0;
-    let newQuotesAdded = 0;
-
+async function fetchQuotesFromServer() {
     try {
         const response = await fetch(SERVER_URL);
-        if (!response.ok) throw new Error('Network response was not ok');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         
-        // Fetch mock posts and map them to our quote structure
+    
         const serverData = await response.json();
         
-        // Use only the first 5 server posts for a manageable simulation
+        // Map posts to our quote format (using only the first 5 for simulation)
         const serverQuotes = serverData.slice(0, 5).map(post => ({
-            // Server quotes get a specific ID to simulate unique server records
+            // Assign a unique server ID
             id: `server-${post.id}`, 
             text: post.title, 
             category: `Server-${post.userId}` 
         }));
-
-        let quotesBeforeSync = quotes.length;
         
-        // Conflict Resolution Loop: Server Data Precedence (Last Write Wins)
-        serverQuotes.forEach(serverQ => {
-            const existingIndex = quotes.findIndex(localQ => localQ.id === serverQ.id);
-
-            if (existingIndex !== -1) {
-                // Case 1: Conflict/Match found (ID match)
-                // Server data takes precedence: overwrite local quote
-                if (quotes[existingIndex].text !== serverQ.text) {
-                     conflictsResolved++;
-                }
-                quotes[existingIndex] = serverQ;
-            } else {
-                // Case 2: New quote from server
-                quotes.push(serverQ);
-                newQuotesAdded++;
-            }
-        });
-        
-        // Update local storage and UI elements
-        saveQuotes();
-        populateCategories();
-        
-        // Step 3: Notification System
-        if (conflictsResolved > 0 || newQuotesAdded > 0) {
-            alert(`Sync complete! ${newQuotesAdded} new quotes added, ${conflictsResolved} conflicts resolved (Server data won).`);
-        } else if (quotes.length > quotesBeforeSync) {
-             // Handle case where we only added new quotes without conflicts
-             alert(`Sync complete! ${quotes.length - quotesBeforeSync} quotes added.`);
-        } else {
-            // Optional: Notify when no changes occurred
-            // console.log("No new updates from server.");
-        }
+        return serverQuotes;
 
     } catch (error) {
-        console.error("Error during sync:", error);
-        quoteDisplay.innerHTML = `<p style="color:red;">Error syncing with server. Check console for details.</p>`;
+        console.error("Failed to fetch quotes from server:", error);
+        document.getElementById('quoteDisplay').innerHTML = 
+            `<p style="color:red;">Failed to connect to server for sync. Check console.</p>`;
+        return []; // Return empty array on failure
+    }
+}
+
+// --- Step 2 & 3: Data Syncing and Conflict Resolution ---
+
+/**
+ * Implements periodic data fetching, syncing, and conflict resolution.
+ */
+async function syncWithServer() {
+    console.log("Starting data sync...");
+    
+    // Call the new dedicated function
+    const serverQuotes = await fetchQuotesFromServer(); 
+    
+    if (serverQuotes.length === 0) {
+        console.log("Sync skipped due to server error or no data.");
+        return;
+    }
+
+    let conflictsResolved = 0;
+    let newQuotesAdded = 0;
+    
+    // Save current length for comparison
+    const quotesBeforeSync = quotes.length; 
+
+    // Conflict Resolution Loop: Server Data Precedence (Last Write Wins)
+    serverQuotes.forEach(serverQ => {
+        const existingIndex = quotes.findIndex(localQ => localQ.id === serverQ.id);
+
+        if (existingIndex !== -1) {
+            // Case 1: Conflict/Match found (ID match)
+            if (quotes[existingIndex].text !== serverQ.text) {
+                 conflictsResolved++;
+            }
+            // Server data takes precedence: overwrite local quote
+            quotes[existingIndex] = serverQ;
+        } else {
+            // Case 2: New quote from server
+            quotes.push(serverQ);
+            newQuotesAdded++;
+        }
+    });
+    
+    // Update local storage and UI elements
+    saveQuotes();
+    populateCategories();
+    
+    // Step 3: Notification System
+    if (conflictsResolved > 0 || newQuotesAdded > 0) {
+        alert(`Sync complete! ${newQuotesAdded} new quotes added, ${conflictsResolved} conflicts resolved (Server data won).`);
+    } else if (quotes.length > quotesBeforeSync) {
+        alert(`Sync complete! ${quotes.length - quotesBeforeSync} quotes added.`);
     }
 }
 
@@ -85,7 +106,7 @@ async function syncWithServer() {
 setInterval(syncWithServer, SYNC_INTERVAL);
 
 
-// --- Core UI Functions (Simplified for brevity, main logic retained) ---
+// --- Core UI Functions (Retained from previous step) ---
 
 function showRandomQuote() {
     const selectedCategory = document.getElementById('categoryFilter').value;
@@ -159,7 +180,7 @@ function addQuote() {
 
 function createAddQuoteForm() {
     const container = document.getElementById('formContainer');
-
+    
     container.innerHTML = `
         <h3>Add New Quote (Local)</h3>
         <input id="newQuoteText" type="text" placeholder="Enter quote text" style="width:70%; padding:8px;">
@@ -168,17 +189,17 @@ function createAddQuoteForm() {
     `;
 }
 
-// --- Import/Export (Retained) ---
+// --- Import/Export (Stubs retained) ---
 function exportToJsonFile() { /* ... implementation ... */ }
 function importFromJsonFile(event) { /* ... implementation ... */ }
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
-
-    createAddQuoteForm();
-
-    populateCategories();
     
+    createAddQuoteForm();
+    
+    populateCategories();
+   
     showRandomQuote();
     
     // Initial server sync upon page load

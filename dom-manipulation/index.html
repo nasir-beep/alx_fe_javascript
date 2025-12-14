@@ -3,36 +3,138 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Quote Generator - Pro</title>
+    <title>Dynamic Quote Generator - Persistence & Filtering</title>
     <style>
-        body { font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; line-height: 1.6; }
-        #quoteDisplay { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-left: 5px solid #007bff; background: #fefefe; min-height: 60px; }
-        .quote-category { font-weight: bold; color: #555; display: block; margin-top: 10px; font-style: normal; }
-        .controls, .storage-ops { margin: 20px 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        button { padding: 10px 15px; cursor: pointer; border-radius: 4px; border: none; background: #007bff; color: white; }
-        button:hover { background: #0056b3; }
-        .export-btn { background: #6c757d; }
-        input[type="file"] { font-size: 0.9em; }
-        #formContainer { border: 1px dashed #ccc; padding: 20px; background: #f9f9f9; border-radius: 8px; }
+        /* General Layout */
+        body { 
+            font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif; 
+            padding: 20px; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            line-height: 1.6; 
+            background-color: #f8f9fa;
+        }
+        h1 { 
+            color: #1e3a8a; 
+            border-bottom: 3px solid #3b82f6; 
+            padding-bottom: 10px;
+        }
+        hr { border: 0; border-top: 1px dashed #ccc; margin: 30px 0; }
+
+        /* Controls and Filtering */
+        .controls { 
+            margin: 20px 0; 
+            display: flex; 
+            gap: 15px; 
+            align-items: center; 
+            flex-wrap: wrap; 
+            padding: 10px;
+            background-color: #e0f2f1;
+            border-radius: 6px;
+        }
+        .controls label { font-weight: bold; color: #004d40; }
+        #categoryFilter { 
+            padding: 8px; 
+            border-radius: 4px; 
+            border: 1px solid #ccc; 
+            min-width: 150px;
+        }
+
+        /* Quote Display Area */
+        #quoteDisplay { 
+            margin: 20px 0; 
+            padding: 25px; 
+            border: 1px solid #cce5ff; 
+            border-left: 8px solid #3b82f6; 
+            background: #ffffff; 
+            min-height: 80px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+        #quoteDisplay p { 
+            font-size: 1.4em; 
+            font-style: italic; 
+            margin: 0 0 10px 0; 
+            color: #333;
+        }
+        .quote-category { 
+            font-weight: bold; 
+            color: #6c757d; 
+            display: block; 
+            font-size: 0.9em;
+        }
+
+        /* Buttons and Storage Operations */
+        button { 
+            padding: 10px 18px; 
+            cursor: pointer; 
+            border-radius: 4px; 
+            border: none; 
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        #newQuote { 
+            background-color: #10b981; 
+            color: white; 
+        }
+        #newQuote:hover { background-color: #059669; }
+        
+        .storage-ops { 
+            margin: 20px 0; 
+            display: flex; 
+            gap: 10px; 
+            align-items: center; 
+            flex-wrap: wrap; 
+            padding: 10px 0;
+        }
+        .export-btn { 
+            background-color: #f59e0b; 
+            color: white; 
+        }
+        .export-btn:hover { background-color: #d97706; }
+        input[type="file"] { font-size: 0.9em; padding: 5px 0; }
+
+        /* Dynamically Generated Form Area */
+        #formContainer { 
+            border: 1px dashed #60a5fa; 
+            padding: 20px; 
+            background: #eff6ff; 
+            border-radius: 8px; 
+        }
+        #formContainer h3 { color: #1e3a8a; margin-top: 0; }
+        #formContainer input { 
+            padding: 10px; 
+            margin-right: 10px; 
+            margin-bottom: 10px;
+            border: 1px solid #93c5fd;
+            border-radius: 4px;
+        }
+        #formContainer button { 
+            background-color: #3b82f6; 
+            color: white; 
+        }
+        #formContainer button:hover { background-color: #2563eb; }
     </style>
 </head>
 <body>
     <h1>Dynamic Quote Generator</h1>
 
     <div class="controls">
-        <label for="categoryFilter">Filter:</label>
+        <label for="categoryFilter">Filter by Category:</label>
         <select id="categoryFilter" onchange="filterQuotes()">
             <option value="all">All Categories</option>
-        </select>
+            </select>
         <button id="newQuote" onclick="showRandomQuote()">Show New Quote</button>
     </div>
 
     <div id="quoteDisplay">
-        </div>
+        <p>Loading quotes...</p>
+    </div>
 
+    <h2>Data Management</h2>
     <div class="storage-ops">
         <button class="export-btn" onclick="exportToJsonFile()">Export Quotes (JSON)</button>
-        <label for="importFile">Import Quotes: </label>
+        <label for="importFile">Import Quotes:</label>
         <input type="file" id="importFile" accept=".json" onchange="importFromJsonFile(event)" />
     </div>
 

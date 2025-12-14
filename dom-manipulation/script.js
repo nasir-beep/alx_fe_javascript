@@ -82,7 +82,6 @@ async function postQuoteToServer(quoteObject) {
 
 /**
  * MANDATORY: Implements periodic data fetching, syncing, and conflict resolution.
- * This is the function that replaces syncWithServer.
  */
 async function syncQuotes() {
     console.log("Starting data sync (syncQuotes)...");
@@ -122,10 +121,12 @@ async function syncQuotes() {
     populateCategories();
     
     // 4. Notification System
-    if (conflictsResolved > 0 || newQuotesAdded > 0) {
-        alert(`Sync complete! ${newQuotesAdded} new quotes added, ${conflictsResolved} conflicts resolved (Server data won).`);
-    } else if (quotes.length > quotesBeforeSync) {
-        alert(`Sync complete! ${quotes.length - quotesBeforeSync} quotes added.`);
+    if (conflictsResolved > 0 || newQuotesAdded > 0 || quotes.length > quotesBeforeSync) {
+        // This is the required alert string for a successful sync operation
+        alert("Quotes synced with server!"); 
+    } else {
+        // Optional: Alerting the specific stats for detailed feedback
+        // alert(`Sync complete. No major changes detected. Conflicts: ${conflictsResolved}`);
     }
 }
 
@@ -261,6 +262,5 @@ document.addEventListener('DOMContentLoaded', () => {
     populateCategories();
     showRandomQuote();
     
-    // Initial server sync upon page load
     syncQuotes();
 });
